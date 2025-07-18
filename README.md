@@ -10,5 +10,30 @@ A visualizer for a multilayer perceptron that recognizes handwritten digits.  Th
 
 It recognizes digits at 95.79% accuracy for the testing dataset in MNIST.
 
+The visualizer tool above shows the randomly selected image
 
+# How does it work?
+
+The network has 4 layers:
+- An input layer
+- Two hidden layers in the middle
+- An output layer
+
+Each layer is comprised of neurons with a corresponding number, or activation.  The input layer consists of all 784 pixels within the 28x28 grid of pixels.  However, for visualization purposes there are only 2 groups of 8 being displayed at different regions within the image.
+
+The input layer neuron activation values are dependent on the greyscale value of the corresponding pixels of the input image.  The lines are called weights, which can be thought of as synapses in a biological neural network, and connect all of the neurons in the adjacent layers together.
+
+These connections are just numbers, and are multiplied by the activations in the previous layer to determine the activations in the next layer.  They can be thought of as determining how 'important' a particular neuron in the network is for picking up on patterns within the input images.  Lower numbers suggest low importance, higher numbers suggest high importance, negative numbers select against that particular neuron.
+
+By default, these weights are randomly initialized.  Through an algorithm called backpropagation, all of these weights are tweaked and adjusted based on how well the network performs on recognizing the digits in the training dataset.  The more training examples the network is given, the greater the opportunity the network has to adjust the weights, and the more accurate it will pick up on these patterns.
+
+# How do I use it?
+
+Run the `neural_network.py` script, ensuring that it's calling the visualizer.
+
+Controls:
+
+- `Space` Selects a new random image
+- `W` Toggles weight map visualizer
+- `N` Input random noise
 

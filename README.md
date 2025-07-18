@@ -37,7 +37,7 @@ By default, these weights are randomly initialized.  Through an algorithm called
 # How do I use it?
 
 1. Download contents of `neural_network`
-2. Unzip the `serialized_network_parameters` zip file
+2. Unzip the `serialized_network_parameters.zip` file
 3. Run the `neural_network.py` script, ensuring that it's calling the visualizer's loop method.
 
 Controls:

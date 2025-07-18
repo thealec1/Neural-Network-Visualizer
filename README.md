@@ -10,7 +10,14 @@ A visualizer for a multilayer perceptron that recognizes handwritten digits.  Th
 
 It recognizes digits at 95.79% accuracy for the testing dataset in MNIST.
 
-The visualizer tool above shows the randomly selected image
+The visualizer tool above shows the randomly selected image '3' being accurately identified as the number 3.
+
+The colour coding is as follows:
+
+- `Purple`: Positive weights relative to the 1st layer maximum
+- `Dark Blue`: Negative weights relative to the 1st layer minimum
+- `Orange`: Positive weights relative to the global maximum in the 2nd and 3rd layers
+- `Light Blue`: Negative weights relative to the global minimum in the 2nd and 3rd layers
 
 # How does it work?
 

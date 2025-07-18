@@ -10,7 +10,7 @@ A visualizer for a multilayer perceptron that recognizes handwritten digits.  Th
 
 It recognizes digits at 95.79% accuracy for the testing dataset in MNIST.
 
-The visualizer tool above shows the randomly selected image '3' being accurately identified as the number 3.
+The visualizer tool above shows the randomly selected image '3' being accurately identified, as seen by the network's output number.
 
 The colour coding is as follows:
 

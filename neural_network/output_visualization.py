@@ -12,9 +12,15 @@ LARGE_FONT = pg.font.Font(None, 40)
 SMALL_FONT = pg.font.Font(None, 18)
 WHITE = (255, 255, 255)
 
+def lerp_colours(first_colour, second_colour, weight):
+    r, g, b = zip(first_colour, second_colour)
+    r_max, r_min = max(r), min(r)
+    g_max, g_min = max(g), min(g)
+    b_max, b_min = max(b), min(b)
+    return (pg.math.lerp(r_min, r_max, weight), pg.math.lerp(g_min, g_max, weight), pg.math.lerp(b_min, b_max, weight))
+
 class RenderUtils:
 
-    @staticmethod
     def draw_alpha_line(target_surface : pg.Surface, colour : tuple, start_pos : tuple, end_pos : tuple, alpha : int, thickness : int):
         x1,y1 = start_pos
         x2,y2 = end_pos
@@ -28,13 +34,15 @@ class RenderUtils:
         pg.draw.line(line_surface, colour, (0, start_y), (w, end_y), thickness)
         target_surface.blit(line_surface, (x1, min(y2,y1)))
 
-    def get_neuron_colour(weight, max_weight, min_weight) -> tuple:
-        # print(f"max{weight/max_weight} min{abs(weight/min_weight)}")
-        orange_blue = True
+    def get_neuron_colour(weight, max_weight, min_weight, in_first_layer=False) -> tuple:
+        
+        max_weight_ratio = weight/max_weight
+        min_weight_ratio = abs(weight/min_weight)
+
         if weight > 0:
-            return (255, int(pg.math.lerp(106, 157, weight/max_weight)), 0) if orange_blue else (0, int(pg.math.lerp(50, 255, weight / max_weight)), 0)
+            return lerp_colours( (255, 106, 0), (255, 157, 0), max_weight_ratio) if not in_first_layer else lerp_colours( (255, 0, 238), (200, 0, 255), max_weight_ratio)
         else:
-            return (0, int(pg.math.lerp(51, 213, abs(weight/min_weight))), 255) if orange_blue else (int(pg.math.lerp(50, 255, (weight / min_weight))), 0, 0)
+            return lerp_colours( (0, 51, 255), (0, 213, 255), min_weight_ratio) if not in_first_layer else lerp_colours((74, 164, 255), (34, 0, 255), min_weight_ratio)
 
 class RenderNeuron:
 
@@ -51,23 +59,31 @@ class RenderNeuron:
         self.radius = radius
         self.weight_colours = []
 
-    def pattern_render(self, display : pg.Surface):
-        connections = self.neuron.weights
+    def weight_map_render(self, display : pg.Surface):
+        self.in_first_layer = self in self.render_network.first_hidden_neurons
+
+        if self.in_first_layer:
+            self.max_w = self.render_network.first_layer_max_weight
+            self.min_w = self.render_network.first_layer_min_weight
+        else:
+            self.max_w = self.render_network.max_weight
+            self.min_w = self.render_network.min_weight
+
+        connections = self.neuron.weights 
+
         dim = int(math.sqrt(len(connections)))
         weight_pixel_array = pg.PixelArray(pg.Surface((dim, dim)))
         index = 0
-        max_w = self.render_network.max_weight
-        min_w = self.render_network.min_weight
         for row in range(dim):
             for col in range(dim):
-                weight_pixel_array[col, row] = RenderUtils.get_neuron_colour(connections[index], max_w, min_w)
+                weight_pixel_array[col, row] = RenderUtils.get_neuron_colour(connections[index], self.max_w, self.min_w, in_first_layer=self.in_first_layer)
                 index += 1
         size = (self.radius*2)-5
         weight_pixel_surface = pg.transform.scale(weight_pixel_array.surface, (size, size))
         w,h = weight_pixel_surface.get_size()
         display.blit(weight_pixel_surface, (self.x-(w//2), self.y-(h//2)))
 
-    def basic_render(self, display : pg.Surface):
+    def neuron_render(self, display : pg.Surface):
         rgb_value = int(self.activation/self.max_activation * 255)
         greyscale_shade = (rgb_value, rgb_value, rgb_value)
 
@@ -84,11 +100,11 @@ class RenderNeuron:
             nwidth, nheight = neuron_digit_label.get_size()
             display.blit(neuron_digit_label, (self.x+self.radius*1.5, self.y-nheight//2))
 
-    def render(self, do_pattern_render : bool, display : pg.Surface):
-        if do_pattern_render and not self.in_input_layer:
-            self.pattern_render(display)
+    def render(self, do_weight_map_render : bool, display : pg.Surface):
+        if do_weight_map_render and not self.in_input_layer:
+            self.weight_map_render(display)
         else:
-            self.basic_render(display)
+            self.neuron_render(display)
 
 class NetworkRenderer:
 
@@ -119,18 +135,32 @@ class NetworkRenderer:
         self.number_surface = self.colour_array_to_image(self.network.image)
         
         self.generate()
+
+        first_layer_total_weights = []
+        first_layer_total_weights = self.append_weights(self.network.input_layer, self.network.first_hidden_layer, first_layer_total_weights)
+        self.first_layer_max_weight = max(first_layer_total_weights)
+        self.first_layer_min_weight = min(first_layer_total_weights)
+
+        first_layer_render_weights = []
+        first_layer_render_weights = self.append_weights(self.input_neurons, self.first_hidden_neurons, first_layer_render_weights, render_max=True)
+        self.first_layer_render_max = max(first_layer_render_weights)
+        self.first_layer_render_min = min(first_layer_render_weights)
+
         weights = []
-        weights = self.append_weights(self.input_neurons, self.first_hidden_neurons, weights)
-        weights = self.append_weights(self.first_hidden_neurons, self.second_hidden_neurons, weights)
-        weights = self.append_weights(self.second_hidden_neurons, self.output_neurons, weights)
+        weights = self.append_weights(self.network.first_hidden_layer, self.network.second_hidden_layer, weights)
+        weights = self.append_weights(self.network.second_hidden_layer, self.network.output_layer, weights)
         self.max_weight = max(weights)
         self.min_weight = min(weights)
 
-    def append_weights(self, selected_layer, connected_layer, weights):
-        for render_neuron in selected_layer:
-            for i in range(len(connected_layer)):
-                connected_neuron = connected_layer[i]
-                weight = connected_neuron.neuron.weights[render_neuron.index]
+    def append_weights(self, selected_layer, connected_layer, weights, render_max=False):
+        for k in range(len(selected_layer)):
+            for j in range(len(connected_layer)):
+                if render_max:
+                    connected_neuron = connected_layer[j].neuron
+                    weight = connected_neuron.weights[selected_layer[k].index]
+                else:
+                    connected_neuron = connected_layer[j]
+                    weight = connected_neuron.weights[k]
                 weights.append(weight)
         return weights
 
@@ -212,19 +242,28 @@ class NetworkRenderer:
         self.output_number = activation_list.index(max(activation_list))
 
     def draw_lines_for_layer(self, display : pg.Surface, selected_layer, connected_layer):
+        
+        if connected_layer == self.first_hidden_neurons:
+            in_first_layer = True
+            layer_max = self.first_layer_render_max
+            layer_min = self.first_layer_render_min
+        else:
+            in_first_layer = False
+            layer_max = self.max_weight
+            layer_min = self.min_weight
+        
         for render_neuron in selected_layer:
             render_neuron.weight_colours = []
             for i in range(len(connected_layer)):
                 connected_neuron = connected_layer[i]
                 weight = connected_neuron.neuron.weights[render_neuron.index]
                 
-                line_colour = RenderUtils.get_neuron_colour(weight, self.max_weight, self.min_weight)
+                line_colour = RenderUtils.get_neuron_colour(weight, layer_max, layer_min, in_first_layer=in_first_layer)
 
                 render_neuron.weight_colours.append(line_colour)
 
-                # TODO Come back to this visualization when network is trained
-                line_thickness = int(max(4*abs(weight)/self.max_weight, 1))
-                line_alpha = int(max(255*(abs(weight)/self.max_weight), 0))
+                line_thickness = int(max(4*abs(weight)/layer_max, 1))
+                line_alpha = int(max(255*(abs(weight)/layer_max), 0))
                 
                 RenderUtils.draw_alpha_line(display, line_colour, (render_neuron.x, render_neuron.y), (connected_neuron.x, connected_neuron.y), line_alpha, line_thickness)
 
@@ -255,12 +294,12 @@ class NetworkRenderer:
         display.blit(output_text, (display.get_width()-output_text.get_width()-10, display.get_height()//2-output_text.get_height()//2))
         display.blit(self.number_surface, ((sw*1/8-20)//2-(nw//2), (sh//2)-(nh//2)))
 
-    def render(self, do_pattern_render, display : pg.Surface):
+    def render(self, do_weight_map_render, display : pg.Surface):
         
         self.render_synaptic_connections(display)
         
         for neuron in self.neurons:
-            neuron.render(do_pattern_render, display)
+            neuron.render(do_weight_map_render, display)
         
         self.render_image_with_label(display)
 
@@ -272,7 +311,7 @@ def loop():
     clock = pg.time.Clock()
     running = True
     network_renderer = NetworkRenderer(display)
-    do_pattern_render = False
+    do_weight_map_render = False
     noise_mode = False
     while running:
         for event in pg.event.get():
@@ -284,8 +323,8 @@ def loop():
                         network_renderer.randomize(noise_mode)
                     continuous_input = False
                     space_frame_counter = 0
-                if event.key == pg.K_p:
-                    do_pattern_render = not do_pattern_render
+                if event.key == pg.K_w:
+                    do_weight_map_render = not do_weight_map_render
                 if event.key == pg.K_n:
                     noise_mode = not noise_mode
                     network_renderer.randomize(noise_mode)
@@ -300,7 +339,7 @@ def loop():
         pg.display.update()
         clock.tick(60)
         display.fill((10, 10, 10))
-        network_renderer.render(do_pattern_render, display)
+        network_renderer.render(do_weight_map_render, display)
 
     pg.quit()
 
